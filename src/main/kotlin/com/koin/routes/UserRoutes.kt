@@ -19,13 +19,16 @@ import com.koin.services.users.UserService
 
 fun Route.userRoutes(userService: UserService) {
     route("/users") {
-        post {
-            val user = call.receive<UserDTO>()
-            val erros = user.validate()
-            if (erros.isNotEmpty()) {
-                return@post call.respond(HttpStatusCode.BadRequest, erros)
+        rateLimit (RateLimitName("register")) {
+            post {
+                val user = call.receive<UserDTO>()
+                val erros = user.validate()
+                if (erros.isNotEmpty()) {
+                    return@post call.respond(HttpStatusCode.BadRequest, erros)
+                }
+                call.respond(HttpStatusCode.Created, userService.createUser(user))
             }
-            call.respond(HttpStatusCode.Created, userService.createUser(user))
+
         }
         // M6: só o /login entra no balde de rate limit. Aplicar o limite na API inteira puniria uso
         // normal (uma tela lista categorias e custos em sequência); o alvo é a rota que aceita

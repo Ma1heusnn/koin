@@ -891,4 +891,28 @@ class ApplicationTest {
         }
         assertEquals(HttpStatusCode.OK, resp.status)
     }
+    @Test
+    fun `cadastro excede o rate limit e retorna 429 (S4)`() = testApplication {
+        bootH2()
+        val client = jsonClient()
+
+        repeat(5) { i ->
+            val resp = client.post("/users") {
+
+                contentType(ContentType.Application.Json)
+                setBody(UserDTO(email =
+                    "s4_$i@exemplo.com", password = "senha1234", username = "s4user$i"))
+            }
+            assertEquals(HttpStatusCode.Created,
+                resp.status, "cadastro ${i + 1} deveria passar")
+        }
+
+        val bloqueado = client.post("/users") {
+            contentType(ContentType.Application.Json)
+            setBody(UserDTO(email =
+                "s4_5@exemplo.com", password = "senha1234", username = "s4user5"))
+        }
+        assertEquals(HttpStatusCode.TooManyRequests,
+            bloqueado.status)
+    }
 }

@@ -21,6 +21,15 @@ no XML). Nada aqui deixou a suíte vermelha — os achados são de código que n
 > **Os caminhos citados nos achados abaixo são os de antes do `f1d4052`** — hoje tudo mora sob
 > `src/main/kotlin/com/koin/`, e `repositories/` chama-se `tables/`. Próximo da fila: **S4**.
 
+> **Atualização 2026-09-03 — S4 fechado, suíte em 30 testes, 0 falhas:**
+>
+> | Achado | Estado | Commit |
+> |---|---|---|
+> | **S4** | ✅ resolvido | este |
+>
+> Seguem abertos: **S5–S8**, **M1–M5**, **E3**, **E5** e as duas pontas do E2.
+> Próximo da fila: **S5 + S6**.
+
 **Prefixos:** `S` = segurança/corretude · `M` = módulo/rota faltando · `E` = estrutura.
 
 **Dois achados foram verificados RODANDO**, não só lendo (marcados ✅). Os testes temporários que
@@ -31,10 +40,11 @@ teste na hora de consertar. Princípio 8: não afirmar sem rodar.
 
 1. ~~**S1**~~ — ✅ fechado em 2026-07-31 (`cbdc65c`). Era o único explorável por terceiro.
 2. ~~**S2 + S3**~~ — ✅ fechados (`f3595b0` e este commit). Mesma família (validação de Patch).
-3. **S4** — 5 linhas reaproveitando plugin já instalado. **Próximo da fila.**
+3. ~~**S4**~~ — ✅ fechado em 2026-09-03 (este commit). 5 linhas reaproveitando plugin já instalado,
+   como previsto — as duas pontas (cadastro **e** refresh).
 4. ~~**E1 + E2**~~ — ✅ a parte que importava saiu em `f1d4052`: com `validateUser` já virado
    `UserDTO.validate()` em `models/`, **o S2 está destravado** — pode ser atacado direto.
-5. **S5 + S6** — mentira de status code; conserto mecânico.
+5. **S5 + S6** — mentira de status code; conserto mecânico. **Próximo da fila.**
 6. **M1 / M2** — precisam de decisão de contrato/domínio antes do código.
 7. ~~**E1 + E4**~~ — ✅ fechados em 2026-07-31 (`f1d4052`); o **E2** foi junto quase todo (ver lá).
    Sobrou o **E3** + as duas pontas do E2, que agora vão de carona nele. **E5** segue por último.
@@ -217,7 +227,33 @@ do S2 nasce já com ela).
 
 ---
 
-## S4 🟠 MÉDIO — `POST /users` sem rate limit, e cada request paga um BCrypt
+## ~~S4~~ ✅ **RESOLVIDO** em 2026-09-03 — `POST /users` sem rate limit, e cada request paga um BCrypt
+
+> **Como foi fechado:** dois baldes novos no `RateLimit` já instalado (`Application.kt`), **chave só
+> de IP** nos dois, e o `post` de cada rota envolvido em `rateLimit(RateLimitName(...))`:
+>
+> | Balde | Rota | Limite |
+> |---|---|---|
+> | `register` | `POST /users` | 5 / 60s |
+> | `refreshToken` | `POST /auth/refresh` | 10 / 60s |
+>
+> A ponta do refresh (citada abaixo como opcional) entrou junto — mesmo plugin, mesma forma.
+>
+> **Por que a chave não compõe com identifier, ao contrário do `login` (M6):** no cadastro todo
+> identifier é novo por definição, então compor daria um balde novo por request — limite que nunca
+> dispara. No refresh é pior: o token **rotaciona a cada chamada**, então a chave nunca se repete.
+> Uma primeira versão com `runCatching { call.receive<RefreshRequest>().refreshToken }` na chave foi
+> descartada por isso (e ainda vazava o token cru para dentro da chave do balde).
+>
+> **Herda o `ponytail:` do M6:** atrás de proxy sem `XForwardedHeaders`, os dois baldes viram um só
+> para todo mundo.
+>
+> **Verificado:** `gradlew test` → **30 testes, 0 falhas** (eram 29). O teste novo faz 6 `POST /users`
+> do mesmo IP e exige **429** no 6º. ⚠️ Ele **nasceu verde** — não foi visto vermelho antes do
+> conserto, ao contrário dos do S1. Princípio 8 fica com essa ressalva registrada.
+>
+> O relato original fica abaixo.
+
 
 **Onde:** `routes/UserRoutes.kt:22-30`, `Application.kt:84-130` (o `RateLimit` só registra o balde
 `login`).

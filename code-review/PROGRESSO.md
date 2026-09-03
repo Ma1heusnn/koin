@@ -1,8 +1,14 @@
 # Code Review — Backend Ktor (kotlinAPI)
 
-> 🔴 **ABERTOS: ver [`ACHADOS-ABERTOS.md`](ACHADOS-ABERTOS.md) — S4–S8, M1–M5, E3, E5** (+ duas
-> pontas do E2). Varredura de 2026-07-29 sobre o código inteiro. **Próximo: S4** (rate limit no
-> `POST /users`, ~5 linhas no plugin já instalado).
+> 🔴 **ABERTOS: ver [`ACHADOS-ABERTOS.md`](ACHADOS-ABERTOS.md) — S5–S8, M1–M5, E3, E5** (+ duas
+> pontas do E2). Varredura de 2026-07-29 sobre o código inteiro. **Próximo: S5 + S6** (validação de
+> tamanho e 409 mentiroso — conserto mecânico).
+>
+> ✅ **S4 fechado (2026-09-03).** Rate limit nas duas rotas públicas que faltavam: balde `register`
+> (5/60s) no `POST /users` — cada cadastro pagava um BCrypt de CPU para um anônimo — e `refreshToken`
+> (10/60s) no `POST /auth/refresh`. Chave **só de IP** nos dois: compor com identifier daria balde
+> novo a cada request (todo cadastro é conta nova; o refresh token rotaciona a cada chamada).
+> **Suíte: 30 testes, 0 falhas** (eram 29).
 >
 > ✅ **S2 e S3 fechados (2026-08-10 `f3595b0`; 2026-08-19).** A família "validação de Patch":
 > `UserPatch` ganhou `validate()` (era o único Patch sem), e os três Patch ganharam o guard de corpo
@@ -323,4 +329,5 @@ Progresso das correções do code review. Ordem de ataque: **C1 → C2 → C3 �
 15. Verificar antes de escrever nunca é garantia — é TOCTOU (P4, P6). Quem garante é a constraint / o row count da escrita. A pré-checagem só se paga quando produz informação que o resultado da escrita **não** produz **e** essa informação **muda a ação do cliente**: no P4 o 409 não diz qual campo conflitou, e "é o email" faz o app acender o input e o retry funcionar (fica); no P6 "é global" é inacionável — global não é deletável por ninguém, então 403 vs 404 não muda nada no app (sai). Quando não se paga, ela vira uma segunda regra para divergir da primeira.
 16. Status HTTP é vocabulário, não sinalização livre (P5): coleção vazia é 200 + `[]`, não 404. Reusar um status para dois significados obriga o cliente a tratar erro como estado normal.
 17. Conversão que pode falhar em entrada de cliente (`toInt()`) é 500 esperando acontecer (P3) — e tratamento de erro **inalcançável** é pior que ausente: passa no review por parecer que existe.
+19. Nome de balde do rate limit é **contrato entre dois arquivos** (S4): `register(RateLimitName("x"))` no plugin e `rateLimit(RateLimitName("x"))` na rota. Divergiu, a app inteira cai — não só a rota protegida: os 29 testes viraram vermelho de uma vez com `IllegalStateException` no `RateLimitInterceptors`. Errar o nome é mais barato de detectar que de raciocinar: a suíte inteira acusa.
 18. Num Patch, **"esse valor é válido?" e "veio algum valor?" são perguntas diferentes** (S3): a primeira olha os campos com regra, a segunda olha TODOS os campos graváveis. Um guard escrito sobre a lista errada rejeita payload legítimo — e o teste que pega isso é o que manda só um campo **sem** regra de valor.

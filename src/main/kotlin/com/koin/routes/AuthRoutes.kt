@@ -10,6 +10,8 @@ import io.ktor.server.routing.route
 import com.koin.models.RefreshRequest
 import com.koin.security.userId
 import com.koin.services.auth.RefreshTokenService
+import io.ktor.server.plugins.ratelimit.RateLimitName
+import io.ktor.server.plugins.ratelimit.rateLimit
 
 fun Route.authRoutes(refreshTokenService: RefreshTokenService) {
     route("/auth") {
@@ -17,19 +19,20 @@ fun Route.authRoutes(refreshTokenService: RefreshTokenService) {
         // PÚBLICO de propósito: quando o cliente chama /refresh, o access token JÁ expirou — não dá
         // para exigir `authenticate` aqui. A credencial deste endpoint é o PRÓPRIO refresh token (no
         // corpo), não o JWT. Ele valida -> rotaciona -> devolve um par novo.
-        post("/refresh") {
-            val request = call.receive<RefreshRequest>()
-            val pair = refreshTokenService.rotate(request.refreshToken)
-            if (pair != null) {
-                call.respond(pair)
-            } else {
-                // Resposta genérica única para todos os modos de falha (desconhecido/expirado/revogado/
-                // reuso). Diferenciar daria ao atacante um oráculo de quais tokens existem — mesma lição
-                // anti-enumeração do login (H7).
-                call.respond(HttpStatusCode.Unauthorized, "Refresh token inválido")
+        rateLimit(RateLimitName("refreshToken")) {
+            post("/refresh") {
+                val request = call.receive<RefreshRequest>()
+                val pair = refreshTokenService.rotate(request.refreshToken)
+                if (pair != null) {
+                    call.respond(pair)
+                } else {
+                    // Resposta genérica única para todos os modos de falha (desconhecido/expirado/revogado/
+                    // reuso). Diferenciar daria ao atacante um oráculo de quais tokens existem — mesma lição
+                    // anti-enumeração do login (H7).
+                    call.respond(HttpStatusCode.Unauthorized, "Refresh token inválido")
+                }
             }
         }
-
         // Logout e logout-all exigem access token válido: identificam QUEM está encerrando a sessão.
         authenticate {
 

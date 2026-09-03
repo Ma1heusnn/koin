@@ -31,6 +31,7 @@ import kotlin.time.Duration.Companion.seconds
 
 fun main(args: Array<String>) {
     EngineMain.main(args)
+
 }
 
 fun Application.module() = appModule(DatabaseFactory.getEnvData())
@@ -124,6 +125,23 @@ fun Application.appModule(dataSource: DataSource) {
                     .getOrNull().orEmpty().trim().lowercase()
 
                 "$ip|$identifier"
+            }
+        }
+        register(RateLimitName("register")){
+            rateLimiter(limit = 5, refillPeriod = 60.seconds)
+            requestKey { call ->
+                val ip = call.request.origin.remoteAddress
+
+                ip
+            }
+        }
+
+        register(RateLimitName("refreshToken")){
+            rateLimiter(limit = 10, refillPeriod = 60.seconds)
+            requestKey { call ->
+                val ip = call.request.origin.remoteAddress
+
+                ip
             }
         }
     }

@@ -4,7 +4,7 @@ API REST de controle de despesas pessoais, feita em **Kotlin + Ktor** como proje
 backend. Autenticação por JWT com refresh token, persistência em MySQL via Exposed e migrations
 versionadas com Flyway.
 
-> ⚠️ **Projeto de estudo.** Roda local, não está em produção. Há achados de segurança conhecidos e
+> ⚠️ Roda local, não está em produção. Há achados de segurança conhecidos e
 > ainda abertos, documentados em [`code-review/ACHADOS-ABERTOS.md`](code-review/ACHADOS-ABERTOS.md).
 > Não use como está em ambiente exposto à internet.
 

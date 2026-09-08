@@ -32,7 +32,7 @@ class CostService {
             val category = Category(
                 it[CategoriesTable.id].value,
                 it[CategoriesTable.name],
-                it[CategoriesTable.image],
+                it[CategoriesTable.icon],
                 it[CategoriesTable.color]
             )
 
@@ -59,7 +59,7 @@ class CostService {
                 val category = Category(
                     it[CategoriesTable.id].value,
                     it[CategoriesTable.name],
-                    it[CategoriesTable.image],
+                    it[CategoriesTable.icon],
                     it[CategoriesTable.color]
                 )
 
@@ -114,7 +114,7 @@ class CostService {
         val category = Category(
             id = categoryRow[CategoriesTable.id].value,
             name = categoryRow[CategoriesTable.name],
-            image = categoryRow[CategoriesTable.image],
+            icon = categoryRow[CategoriesTable.icon],
             color = categoryRow[CategoriesTable.color],
             userId = categoryRow[CategoriesTable.userId]
         )

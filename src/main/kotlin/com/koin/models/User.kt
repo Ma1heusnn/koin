@@ -59,18 +59,23 @@ data class UserPatch(
 fun UserDTO.validate(): List<String> = buildList {
     if (email.isEmpty()) add("O email não deve ser vazio")
     if (!email.contains("@")) add("Email inválido")
+    if (email.length > 128) add ("o email possui mais caracteres que o limite")
 
     if ((password.isEmpty() || password.length < 8)) add("Sua senha deve possuir ao menos 8 caracteres")
 
     if (username.isBlank()) add("O nome não deve ser vazio")
     if (username.contains('@')) add("O nome de usuário não deve conter @")
+    if (username.length > 32) add ("o nome de usuário possui mais caracteres que o limite")
+
 }
 
 fun UserPatch.validate(): List<String> = buildList {
     if (listOfNotNull(email, password, username).isEmpty()) add("Envie ao menos um campo para atualizar")
     email?.let { if (email.isBlank()) add("O email não deve ser vazio") }
     email?.let { if (!email.contains("@")) add("Email inválido") }
+    email?.let { if (email.length > 128) add ("O email possui mais caracteres que o limite") }
     password?.let { if (password.isBlank() || password.length < 8) add("Sua senha deve ter ao menos 8 caracteres") }
     username?.let { if (username.isBlank()) add("O nome de usuário não deve ser vazio") }
     username?.let { if (username.contains('@')) add("O nome de usuário não deve conter @") }
+    username?.let { if (username.length > 32) add ("o nome de usuário possui mais caracteres que o limite") }
 }

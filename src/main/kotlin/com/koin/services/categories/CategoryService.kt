@@ -20,14 +20,14 @@ class CategoryService {
 
         val generatedId = CategoriesTable.insertAndGetId { statement ->
             statement[name] = category.name
-            statement[image] = category.image
+            statement[icon] = category.icon
             statement[color] = category.color
             statement[CategoriesTable.userId] = userId
         }
         Category(
             id = generatedId.value,
             name = category.name,
-            image = category.image,
+            icon = category.icon,
             color = category.color,
             userId = userId
         )
@@ -44,20 +44,20 @@ class CategoryService {
             return@dbQuery
         }
         val defaultCategories = listOf(
-            CategoryDTO("Saúde e Bem Estar", image = "R.drawable.health", color = "#00FF00"),
-            CategoryDTO("Alimentação", image = "R.drawable.food", color = "#FFCF61"),
-            CategoryDTO("Lazer", image = "R.drawable.leisure", color = "#82C8FF"),
-            CategoryDTO("Transporte", image = "R.drawable.transport", color = "#CA86FF"),
-            CategoryDTO("Educação", image = "R.drawable.education", color = "#306DFF"),
-            CategoryDTO("Investimento", image = "R.drawable.investments", color = "#FFCF26"),
-            CategoryDTO("Sem Categoria", image = "R.drawable.none", color = "#C2C2C2")
+            CategoryDTO("Saúde e Bem Estar", icon = "health", color = "#00FF00"),
+            CategoryDTO("Alimentação", icon = "food", color = "#FFCF61"),
+            CategoryDTO("Lazer", icon = "leisure", color = "#82C8FF"),
+            CategoryDTO("Transporte", icon = "transport", color = "#CA86FF"),
+            CategoryDTO("Educação", icon = "education", color = "#306DFF"),
+            CategoryDTO("Investimento", icon = "investments", color = "#FFCF26"),
+            CategoryDTO("Sem Categoria", icon = "none", color = "#C2C2C2")
         )
 
 
         defaultCategories.forEach { category ->
             CategoriesTable.insert {
                 it[name] = category.name
-                it[image] = category.image
+                it[icon] = category.icon
                 it[color] = category.color
                 it[userId] = null
             }
@@ -80,7 +80,7 @@ class CategoryService {
                 Category(
                     id = it[CategoriesTable.id].value,
                     name = it[CategoriesTable.name],
-                    image = it[CategoriesTable.image],
+                    icon = it[CategoriesTable.icon],
                     color = it[CategoriesTable.color],
                     userId = it[CategoriesTable.userId]
                 )
@@ -94,7 +94,7 @@ class CategoryService {
         CategoriesTable.update(where = {( CategoriesTable.id eq id) and (CategoriesTable.userId eq userId)}) {
             patch.name?.let { newName -> it[name] = newName }
             patch.color?.let { newColor -> it[color] = newColor }
-            patch.image?.let { newImage -> it[image] = newImage }
+            patch.icon?.let { newIcon -> it[icon] = newIcon }
         } > 0
     }
 

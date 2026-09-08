@@ -49,6 +49,8 @@ data class CostDTOResponse(
 
 fun CostDTO.validate(): List<String> = buildList {
     if (title.isBlank()) add("O título do custo é obrigatório")
+    if (title.length > 100) add("O título do custo possui mais caracteres que o limite")
+    if (description.length > 255) add("A descrição do custo possui mais caracteres que o limite")
     if (value <= BigDecimal.ZERO) add("O valor do custo deve ser maior que zero")
     if (categoryId <= 0) add("A categoria do custo é obrigatória")
 }
@@ -56,6 +58,8 @@ fun CostDTO.validate(): List<String> = buildList {
 fun CostPatch.validate(): List<String> = buildList {
     if (listOfNotNull(title, description, categoryId, value, type).isEmpty()) add ("Envie ao menos um campo para atualizar")
     title?.let { if (title.isBlank()) add("O título do custo é obrigatório") }
+    title?.let { if (title.length > 100) add("O título do custo possui mais caracteres que o limite") }
+    description?.let { if (description.length > 255) add("A descrição do custo possui mais caracteres que o limite") }
     value?.let { if (value <= BigDecimal.ZERO) add("O valor do custo deve ser maior que zero") }
     categoryId?.let { if (categoryId <= 0 ) add("A categoria do custo é obrigatória") }
 }

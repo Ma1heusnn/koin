@@ -848,7 +848,7 @@ class ApplicationTest {
 
         val token = client.registrarELogar("userPatch@exemplo.com", "userPatchUser")
 
-        val resp = client.patch("/users/profile"){
+        val resp = client.patch("/users/profile") {
             header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(UserPatch())
@@ -891,6 +891,7 @@ class ApplicationTest {
         }
         assertEquals(HttpStatusCode.OK, resp.status)
     }
+
     @Test
     fun `cadastro excede o rate limit e retorna 429 (S4)`() = testApplication {
         bootH2()
@@ -900,19 +901,205 @@ class ApplicationTest {
             val resp = client.post("/users") {
 
                 contentType(ContentType.Application.Json)
-                setBody(UserDTO(email =
-                    "s4_$i@exemplo.com", password = "senha1234", username = "s4user$i"))
+                setBody(
+                    UserDTO(
+                        email =
+                            "s4_$i@exemplo.com", password = "senha1234", username = "s4user$i"
+                    )
+                )
             }
-            assertEquals(HttpStatusCode.Created,
-                resp.status, "cadastro ${i + 1} deveria passar")
+            assertEquals(
+                HttpStatusCode.Created,
+                resp.status, "cadastro ${i + 1} deveria passar"
+            )
         }
 
         val bloqueado = client.post("/users") {
             contentType(ContentType.Application.Json)
-            setBody(UserDTO(email =
-                "s4_5@exemplo.com", password = "senha1234", username = "s4user5"))
+            setBody(
+                UserDTO(
+                    email =
+                        "s4_5@exemplo.com", password = "senha1234", username = "s4user5"
+                )
+            )
         }
-        assertEquals(HttpStatusCode.TooManyRequests,
-            bloqueado.status)
+        assertEquals(
+            HttpStatusCode.TooManyRequests,
+            bloqueado.status
+        )
+    }
+
+    @Test
+    fun `nome do campo icon agora nao aceita mais drawable (S5)`() = testApplication {
+        bootH2()
+        val client = jsonClient()
+        val token = client.registrarELogar(email = "testeS5@gmail.com", username = "testeS5")
+
+        val resp = client.get("/categories") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }.body<List<Category>>().filter { it.userId == null }
+
+        assertEquals("food", resp.first { it.name == "Alimentação" }.icon)
+        assertTrue(resp.none { it.icon.startsWith("R.drawable.") }, "seed ainda no vocabulário antigo")
+    }
+
+    @Test
+    fun `POST categories rejeita icone fora do catalogo (S5)`() = testApplication {
+        bootH2()
+        val client = jsonClient()
+        val token = client.registrarELogar("icone@exemplo.com", "iconeS5")
+
+        val valido = client.post("/categories") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(CategoryDTO(name = "Feira", icon = "food"))
+        }
+        assertEquals(HttpStatusCode.Created, valido.status)
+
+        val invalido = client.post("/categories") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(CategoryDTO(name = "Feira antiga", icon = "R.drawable.food"))
+        }
+        assertEquals(HttpStatusCode.BadRequest, invalido.status)
+    }
+    @Test
+    fun `campos agora possuem validacao de numero de caracteres (S5)` () = testApplication {
+        bootH2()
+        val client = jsonClient()
+        val token = client.registrarELogar(email = "testeS5NumCaracteres@gmail.com", username = "testeS5NumCaracteres")
+
+        val limiteCaracteresTitulo = 101
+        val limiteCaracteresEmail = 129
+        val limiteCaracteresUsername = 33
+        val limiteCaracteresDescricao = 256
+
+        // teste de cadastro com email > 128 caracteres
+        val respostaCadastroEmail = client.post("/users"){
+            contentType(ContentType.Application.Json)
+            setBody(UserDTO(email = "a".repeat(limiteCaracteresEmail) + "@gmail.com", password = "1SenhaLimiteCaracteresS5", username = "TesteS5"))
+        }
+        assertEquals(HttpStatusCode.BadRequest, respostaCadastroEmail.status)
+
+        val respostaCadastroUsername = client.post("/users"){
+            contentType(ContentType.Application.Json)
+            setBody(UserDTO(email = "testedenumerocaracteres@gmail.com", username = "a".repeat(limiteCaracteresUsername), password = "2SenhaLimiteCaracteresS5"))
+        }
+        assertEquals(HttpStatusCode.BadRequest, respostaCadastroUsername.status)
+
+        val respostaCriarCategoriaTitulo = client.post("/categories"){
+            contentType(ContentType.Application.Json)
+            header(HttpHeaders.Authorization, "Bearer $token")
+            setBody(CategoryDTO(name = "a".repeat(limiteCaracteresTitulo)))
+        }
+        assertEquals(HttpStatusCode.BadRequest, respostaCriarCategoriaTitulo.status)
+
+        val categoryId = client.post("/categories"){
+            contentType(ContentType.Application.Json)
+            header(HttpHeaders.Authorization, "Bearer $token")
+            setBody(CategoryDTO(name = "CategoriaTesteS5"))
+        }.body<Category>().id?: 0
+
+        val respostaCriarCustoTitulo = client.post("/costs"){
+            contentType(ContentType.Application.Json)
+            header(HttpHeaders.Authorization, "Bearer $token")
+            setBody(CostDTO(title = "a".repeat(limiteCaracteresTitulo), categoryId = categoryId, value = BigDecimal(100.00), type = TransactionType.OUTFLOW))
+        }
+        assertEquals(HttpStatusCode.BadRequest, respostaCriarCustoTitulo.status)
+
+        val respostaCriarCustoDescricao = client.post("/costs"){
+            contentType(ContentType.Application.Json)
+            header(HttpHeaders.Authorization, "Bearer $token")
+            setBody(CostDTO(title = "TesteS5", description = "a".repeat(limiteCaracteresDescricao), categoryId = categoryId, value = BigDecimal(100.00), type = TransactionType.OUTFLOW))
+        }
+        assertEquals(HttpStatusCode.BadRequest, respostaCriarCustoDescricao.status)
+    }
+
+    @Test
+    fun `PATCH costs recusa titulo acima do limite (S5)`() = testApplication {
+        bootH2()
+        val client = jsonClient()
+        val token = client.registrarELogar("patchTituloS5@exemplo.com", "patchTituloS5")
+
+        val categoryId = client.post("/categories") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(CategoryDTO(name = "Categoria PATCH S5"))
+        }.body<Category>().id!!
+
+        val costId = client.post("/costs") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(
+                CostDTO(
+                    title = "titulo curto",
+                    categoryId = categoryId,
+                    value = BigDecimal(100),
+                    type = TransactionType.OUTFLOW
+                )
+            )
+        }.body<CostDTOResponse>().id
+
+        val resp = client.patch("/costs/$costId") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(CostPatch(title = "a".repeat(101)))
+        }
+        assertEquals(HttpStatusCode.BadRequest, resp.status)
+    }
+
+    @Test
+    fun `PATCH recusa os demais campos acima do limite (S5)`() = testApplication {
+        bootH2()
+        val client = jsonClient()
+        val token = client.registrarELogar("patchLimitesS5@exemplo.com", "patchLimitesS5")
+        fun HttpRequestBuilder.auth() = header(HttpHeaders.Authorization, "Bearer $token")
+
+        val categoryId = client.post("/categories") {
+            auth()
+            contentType(ContentType.Application.Json)
+            setBody(CategoryDTO(name = "Categoria PATCH limites S5"))
+        }.body<Category>().id!!
+
+        val costId = client.post("/costs") {
+            auth()
+            contentType(ContentType.Application.Json)
+            setBody(
+                CostDTO(
+                    title = "titulo curto",
+                    categoryId = categoryId,
+                    value = BigDecimal(100),
+                    type = TransactionType.OUTFLOW
+                )
+            )
+        }.body<CostDTOResponse>().id
+
+        val descricaoLonga = client.patch("/costs/$costId") {
+            auth()
+            contentType(ContentType.Application.Json)
+            setBody(CostPatch(description = "a".repeat(256)))
+        }
+        assertEquals(HttpStatusCode.BadRequest, descricaoLonga.status, "description do custo")
+
+        val nomeLongo = client.patch("/categories/$categoryId") {
+            auth()
+            contentType(ContentType.Application.Json)
+            setBody(CategoryPatch(name = "a".repeat(101)))
+        }
+        assertEquals(HttpStatusCode.BadRequest, nomeLongo.status, "name da categoria")
+
+        val emailLongo = client.patch("/users/profile") {
+            auth()
+            contentType(ContentType.Application.Json)
+            setBody(UserPatch(email = "a".repeat(129) + "@exemplo.com"))
+        }
+        assertEquals(HttpStatusCode.BadRequest, emailLongo.status, "email do usuario")
+
+        val usernameLongo = client.patch("/users/profile") {
+            auth()
+            contentType(ContentType.Application.Json)
+            setBody(UserPatch(username = "a".repeat(33)))
+        }
+        assertEquals(HttpStatusCode.BadRequest, usernameLongo.status, "username do usuario")
     }
 }

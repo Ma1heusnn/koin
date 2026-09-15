@@ -19,3 +19,6 @@ import io.ktor.server.plugins.BadRequestException
  */
 fun ApplicationCall.pathId(): Int =
     parameters["id"]?.toIntOrNull() ?: throw BadRequestException("Parâmetro 'id' inválido")
+
+fun ApplicationCall.moveToId(): Int? =
+    request.queryParameters["moveTo"]?.let { it.toIntOrNull() ?: throw BadRequestException("Parâmetro 'moveTo' inválido")}

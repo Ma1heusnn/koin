@@ -13,6 +13,9 @@ import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
 import com.koin.tables.categories.CategoriesTable
+import com.koin.tables.costs.CostsTable
+import io.ktor.server.plugins.BadRequestException
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
 
 class CategoryService {
 
@@ -25,20 +28,13 @@ class CategoryService {
             statement[CategoriesTable.userId] = userId
         }
         Category(
-            id = generatedId.value,
-            name = category.name,
-            icon = category.icon,
-            color = category.color,
-            userId = userId
+            id = generatedId.value, name = category.name, icon = category.icon, color = category.color, userId = userId
         )
     }
 
     suspend fun sendGlobalCategories() = DatabaseFactory.dbQuery {
 
-        val globalCategoriesExist = CategoriesTable.selectAll()
-            .where { CategoriesTable.userId.isNull() }
-            .empty()
-            .not()
+        val globalCategoriesExist = CategoriesTable.selectAll().where { CategoriesTable.userId.isNull() }.empty().not()
 
         if (globalCategoriesExist) {
             return@dbQuery
@@ -67,15 +63,12 @@ class CategoryService {
     }
 
     suspend fun getCategories(userId: Int): List<Category> = DatabaseFactory.dbQuery {
-        CategoriesTable.selectAll()
-            .where {
+        CategoriesTable.selectAll().where {
                 (CategoriesTable.userId.isNull()) or (CategoriesTable.userId eq userId)
-            }
-            .map {
+            }.map {
                 // M9: userId incluído. Antes ficava de fora e o cliente recebia `userId: null` em
                 // TODA categoria da lista — indistinguível de uma categoria global (que é null de
                 // verdade). O mesmo recurso vinha com shape diferente conforme a rota
-                // (getCategoryById populava, getCategories não). Argumentos nomeados de propósito:
                 // posicional aqui é convite a trocar `image` com `color` sem o compilador reclamar.
                 Category(
                     id = it[CategoriesTable.id].value,
@@ -91,16 +84,46 @@ class CategoryService {
     // DELETE, e ela sumiu quando o row count do deleteWhere passou a ser a autorização. Não existe
     // rota GET /categories/{id}. Se um dia existir, o formato está no addCost (CostService.kt:106).
     suspend fun editCategory(id: Int, userId: Int, patch: CategoryPatch): Boolean = DatabaseFactory.dbQuery {
-        CategoriesTable.update(where = {( CategoriesTable.id eq id) and (CategoriesTable.userId eq userId)}) {
+        CategoriesTable.update(where = { (CategoriesTable.id eq id) and (CategoriesTable.userId eq userId) }) {
             patch.name?.let { newName -> it[name] = newName }
             patch.color?.let { newColor -> it[color] = newColor }
             patch.icon?.let { newIcon -> it[icon] = newIcon }
         } > 0
     }
 
-    suspend fun deleteCategoryById(id: Int, userId: Int): Boolean = DatabaseFactory.dbQuery {
+    suspend fun deleteCategoryById(id: Int, userId: Int, moveToId: Int?): Boolean = DatabaseFactory.dbQuery {
+
+
+        val deletedCategoryExists =
+            CategoriesTable.selectAll().where { (CategoriesTable.id eq id) and (CategoriesTable.userId eq userId) }
+                .empty().not()
+
+        if (!deletedCategoryExists) {
+            return@dbQuery false
+        }
+        val costsFromDeletedCategoryExists =
+            CostsTable.selectAll().where { (CostsTable.categoryId eq id) and (CostsTable.userId eq userId) }.empty()
+                .not()
+
+        when {
+            moveToId == null -> if (costsFromDeletedCategoryExists) throw BadRequestException("A categoria selecionada possui custos, mova-os")
+            else -> {
+                val moveToCategoryExists = CategoriesTable.selectAll()
+                    .where((CategoriesTable.id eq moveToId) and ((CategoriesTable.userId eq userId) or (CategoriesTable.userId.isNull())))
+                    .empty().not()
+
+                if (!moveToCategoryExists) {
+                    throw BadRequestException("moveTo inválido")
+                }
+                CostsTable.update(where = { CostsTable.categoryId eq id }) { it[categoryId] = moveToId }
+
+            }
+        }
+
         CategoriesTable.deleteWhere {
             (CategoriesTable.id eq id) and (CategoriesTable.userId eq userId)
         } > 0
+
+
     }
 }

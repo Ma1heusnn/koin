@@ -1,8 +1,18 @@
 # Code Review — Backend Ktor (kotlinAPI)
 
-> 🔴 **ABERTOS: ver [`ACHADOS-ABERTOS.md`](ACHADOS-ABERTOS.md) — S5–S8, M1–M5, E3, E5** (+ duas
-> pontas do E2). Varredura de 2026-07-29 sobre o código inteiro. **Próximo: S5 + S6** (validação de
-> tamanho e 409 mentiroso — conserto mecânico).
+> 🔴 **ABERTOS: ver [`ACHADOS-ABERTOS.md`](ACHADOS-ABERTOS.md) — S6–S8, M1–M5, E3, E5** (+ duas
+> pontas do E2). Varredura de 2026-07-29 sobre o código inteiro. **Próximo: S6** (409 mentiroso) —
+> e ele **não é mais mecânico**: o cenário real (deletar categoria que tem custos) precisa de
+> decisão de domínio antes do código.
+>
+> ✅ **S5 fechado (2026-09-08, `3374efc`).** Todo `validate()` que já existia passou a checar
+> **tamanho** — `title`/`name` ≤ 100, `description` ≤ 255, `email` ≤ 128, `username` ≤ 32 — com
+> folga proposital em relação à coluna. Payload gigante agora é **400 com a mensagem certa**, não
+> 409 "Registro em Conflito" vindo de um `ExposedSQLException` de data-too-long. No mesmo commit,
+> `image` virou **`icon` com catálogo fechado** de 7 slugs (`ICONS` + `in`) e a migration
+> `V3__category_icon_slugs.sql` limpou o prefixo `R.drawable.` que o backend nunca deveria ter
+> guardado — nome de ícone é contrato de API, não recurso Android. **Suíte: 35 testes, 0 falhas**
+> (eram 30).
 >
 > ✅ **S4 fechado (2026-09-03).** Rate limit nas duas rotas públicas que faltavam: balde `register`
 > (5/60s) no `POST /users` — cada cadastro pagava um BCrypt de CPU para um anônimo — e `refreshToken`

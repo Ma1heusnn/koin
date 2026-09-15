@@ -35,7 +35,7 @@ fun Route.categoryRoutes(categoriesService: CategoryService) {
                 val categoryDTO = call.receive<CategoryDTO>()
 
                 val erros = categoryDTO.validate()
-                if (erros.isNotEmpty()){
+                if (erros.isNotEmpty()) {
                     return@post call.respond(HttpStatusCode.BadRequest, erros)
                 }
 
@@ -54,7 +54,7 @@ fun Route.categoryRoutes(categoriesService: CategoryService) {
                     val patchData = call.receive<CategoryPatch>()
                     val patchError = patchData.validate()
 
-                    if (patchError.isNotEmpty()){
+                    if (patchError.isNotEmpty()) {
                         return@patch call.respond(HttpStatusCode.BadRequest, patchError)
                     }
                     val success = categoriesService.editCategory(id, userId = userId, patchData)
@@ -67,6 +67,7 @@ fun Route.categoryRoutes(categoriesService: CategoryService) {
                 delete {
                     val id = call.pathId()
                     val userId = call.userId()
+                    val moveToId = call.moveToId()
 
                     // P6: o row count do deleteWhere É a autorização (mesmo guarda de corrida do C1),
                     // então não há pré-checagem. Antes havia um getCategoryById que ACEITA categoria
@@ -79,7 +80,7 @@ fun Route.categoryRoutes(categoriesService: CategoryService) {
                     // aparece no GET /categories): distinguir "global" de "de outro dono" custa uma
                     // segunda query, que é justamente a pré-checagem removida aqui, e traria de volta
                     // a janela entre o SELECT e o DELETE.
-                    if (categoriesService.deleteCategoryById(id, userId)) {
+                    if (categoriesService.deleteCategoryById(id, userId, moveToId)) {
                         call.respond(HttpStatusCode.OK, "Categoria excluída com sucesso")
                     } else {
                         call.respond(HttpStatusCode.NotFound, "Nenhuma categoria encontrada")

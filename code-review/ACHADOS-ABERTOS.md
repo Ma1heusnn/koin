@@ -30,6 +30,16 @@ no XML). Nada aqui deixou a suíte vermelha — os achados são de código que n
 > Seguem abertos: **S5–S8**, **M1–M5**, **E3**, **E5** e as duas pontas do E2.
 > Próximo da fila: **S5 + S6**.
 
+> **Atualização 2026-09-09 — S5 fechado, suíte em 35 testes, 0 falhas:**
+>
+> | Achado | Estado | Commit |
+> |---|---|---|
+> | **S5** | ✅ resolvido | `3374efc` |
+>
+> Seguem abertos: **S6–S8**, **M1–M5**, **E3**, **E5** e as duas pontas do E2.
+> Próximo da fila: **S6** — que **deixou de ser mecânico**: o caso concreto (deletar categoria com
+> custos) virou decisão de domínio. Ver a nota no próprio achado.
+
 **Prefixos:** `S` = segurança/corretude · `M` = módulo/rota faltando · `E` = estrutura.
 
 **Dois achados foram verificados RODANDO**, não só lendo (marcados ✅). Os testes temporários que
@@ -44,7 +54,9 @@ teste na hora de consertar. Princípio 8: não afirmar sem rodar.
    como previsto — as duas pontas (cadastro **e** refresh).
 4. ~~**E1 + E2**~~ — ✅ a parte que importava saiu em `f1d4052`: com `validateUser` já virado
    `UserDTO.validate()` em `models/`, **o S2 está destravado** — pode ser atacado direto.
-5. **S5 + S6** — mentira de status code; conserto mecânico. **Próximo da fila.**
+5. ~~**S5**~~ — ✅ fechado em 2026-09-08 (`3374efc`). **S6** segue aberto e **não é mais só
+   conserto mecânico**: o cenário real (`DELETE` de categoria com custos) precisa de decisão de
+   domínio antes do código. **Próximo da fila.**
 6. **M1 / M2** — precisam de decisão de contrato/domínio antes do código.
 7. ~~**E1 + E4**~~ — ✅ fechados em 2026-07-31 (`f1d4052`); o **E2** foi junto quase todo (ver lá).
    Sobrou o **E3** + as duas pontas do E2, que agora vão de carona nele. **E5** segue por último.
@@ -279,7 +291,7 @@ correção se quiser fechar a dimensão de volume.
 
 ---
 
-## S5 🟡 MÉDIO — nenhum campo valida TAMANHO → 409 mentiroso
+## ~~S5~~ ✅ **RESOLVIDO** em 2026-09-08 (`3374efc`) — nenhum campo valida TAMANHO → 409 mentiroso
 
 **Onde:** todos os `validate()` (`models/`) vs. os limites das tabelas.
 
@@ -297,6 +309,39 @@ responde **409 "Registro em Conflito"**, que é falso: não há conflito, o payl
 **Correção:** um `if (campo.length > N)` em cada `validate()` que já existe. O número fica replicado
 entre tabela e validação — aceitável e explícito; ler o length da coluna via Exposed não paga o
 custo. Uma constante por campo se quiser fonte única.
+
+**Como foi fechado (`3374efc`):**
+
+| Campo | Coluna | Limite validado | Nota |
+|---|---|---|---|
+| `title` (custo) | `VARCHAR(128)` | 100 | mais apertado que a coluna, de propósito |
+| `description` (custo) | `VARCHAR(255)` | 255 | |
+| `name` (categoria) | `VARCHAR(128)` | 100 | |
+| `icon` (categoria) | `VARCHAR(255)` | catálogo fechado | 7 slugs — tamanho vira irrelevante |
+| `email` | `VARCHAR(128)` | 128 | |
+| `username` | `VARCHAR(128)` | 32 | |
+
+Os limites entraram nos `validate()` que **já existiam** (`CostDTO`, `CostPatch`, `CategoryDTO`,
+`CategoryPatch`, `UserDTO`, `UserPatch`) — nenhum arquivo novo, nenhuma abstração. Onde o número
+validado é **menor** que a coluna, a folga é intencional: nenhum payload válido chega perto do
+limite do MySQL, então o `ExposedSQLException` de data-too-long deixa de ser alcançável por esses
+campos — que era o objetivo (o 409 mentiroso some porque a exceção some, não porque o handler
+mudou; o handler continua balaio, e isso é o **S6**).
+
+**Bonus no mesmo commit: `image` → `icon`, com catálogo fechado.** O campo deixou de ser string
+livre: `ICONS` é um `setOf` de 7 slugs (`health`, `food`, `leisure`, `transport`, `education`,
+`investments`, `none`) validado com `in`. A migration `V3__category_icon_slugs.sql` renomeia a
+coluna, remove o prefixo `R.drawable.` dos valores existentes e mapeia `sem_foto` → `none`.
+
+- O backend parou de guardar identificador de recurso **Android** (`R.drawable.x`). O nome do ícone
+  é contrato de API; quem resolve slug → desenho é o cliente. Um segundo cliente (web) não teria
+  como usar `R.drawable.` nenhum.
+- Catálogo fechado resolve o tamanho de graça: não existe `icon` de 256 caracteres para recusar.
+- Custo: adicionar ícone novo agora exige mexer no backend. Aceito — o app também precisaria de um
+  drawable novo de qualquer jeito, então deploy dos dois lados já era o caminho.
+
+**Testes:** 30 → **35, 0 falhas**. Cobrem estouro de tamanho em cada família de payload e ícone fora
+do catálogo.
 
 ---
 
@@ -317,6 +362,67 @@ CHECK e data-too-long (S5) não são. Efeito concreto hoje: `DELETE /categories/
 
 A 1ª é mais geral, a 2ª dá mensagem melhor. Decidir junto com o M2/M3 (se custo passar a poder
 ficar sem categoria, o cenário muda).
+
+> **Nota 2026-09-09 (depois do S5):** o S5 tirou os estouros de tamanho de dentro do balaio, mas o
+> handler continua igual — o que sobrou no 409 mentiroso é essencialmente **este** cenário: FK
+> `ON DELETE RESTRICT` no `DELETE /categories/{id}`. E ele **não é conserto mecânico**: antes do
+> código falta decidir o que acontece com os custos órfãos. A decisão define o contrato do
+> `DELETE` — e só então o status code certo fica óbvio.
+
+### Desenho proposto (2026-09-09) — a decidir, **ainda não implementado**
+
+**Pergunta de origem:** "como avisar o usuário que ele vai transferir os custos de uma categoria
+para outra?" A ideia inicial era um endpoint `POST /costs/transfer` recebendo dois IDs de categoria.
+
+**Recomendação: não criar o endpoint separado.** O único chamador dele seria o fluxo de delete, e
+separar as duas operações quebra a atomicidade — transfere, o delete falha, e os custos do usuário
+se mexeram à toa. A forma menor resolve avisar **e** mover no próprio `DELETE`:
+
+```
+DELETE /categories/{id}                -> 409 { "error": "...", "costs": 12 }   se tiver custos
+DELETE /categories/{id}?moveTo={outra} -> 200, move os 12 e apaga
+DELETE /categories/{id}                -> 200                                    se estiver vazia
+```
+
+O aviso cai de graça do protocolo: o app tenta apagar, leva 409 com a contagem, e mostra "essa
+categoria tem 12 custos, mover para onde?" com o seletor — a lista de destinos ele **já tem** do
+`GET /categories`. Sem pré-checagem e sem janela de corrida (mesmo princípio do P6: quem autoriza
+é o row count).
+
+**Esboço do serviço — tudo num `dbQuery` só:**
+
+```
+1. count custos da categoria (user_id + category_id)   // reaproveitar/trocar o costsByCategory,
+                                                       // que hoje é codigo morto (CostService.kt:77)
+2. se > 0 e moveTo == null  -> Refused(count)          // rota responde 409 com a contagem
+3. validar moveTo: existe E (e do user OU global)      // MESMA regra do addCost (CostService.kt:106)
+4. UPDATE costs SET category_id = moveTo WHERE category_id = id AND user_id = userId
+5. DELETE categories WHERE id = id AND user_id = userId
+6. se o passo 5 deu 0 linhas -> rollback -> 404
+```
+
+Ordem importa: update **antes** do delete, mesma transação, e o `0` do delete desfaz o update.
+
+**Alternativas descartadas e por quê:**
+
+- **`category_id` nullable / categoria "Nula" automática.** Parece barato e não é.
+  `getCostsByUser` usa **INNER JOIN** (`CostService.kt:23`): custo com categoria nula *sumiria da
+  lista*. Exigiria virar LEFT JOIN, tornar `CostDTOResponse.category` nullable e mexer no app —
+  raio de alcance grande para um ganho que o `moveTo` já dá. E a global **"Sem Categoria" já
+  existe** no seed (`CategoryService.kt:57`, `icon = none`): ela é só mais uma opção no seletor,
+  não um caso especial no backend. **Não buscar essa categoria por nome no código** — o **S7** diz
+  que duas globais com o mesmo nome passam pelo índice. Quem escolhe o destino é o app.
+- **Custo "inativo" quando a categoria é apagada.** O pior dos três: esconde dinheiro que o usuário
+  gastou de verdade, deixa `balance`/relatórios errados, exige coluna nova e um filtro em toda
+  query. Apagar um rótulo não pode fazer despesa desaparecer.
+
+**Escalabilidade:** o InnoDB já cria índice para a FK `category_id`, então o UPDATE em massa é uma
+sentença indexada. Não precisa de lote nem de job. Se um dia existir "reorganizar custos sem apagar
+a categoria", aí o endpoint de transfer se paga sozinho — hoje é YAGNI.
+
+**Ponta solta a resolver na implementação:** `?moveTo=` apontando para a **própria** categoria que
+está sendo apagada — o passo 4 moveria os custos para ela mesma e o passo 5 apagaria tudo em
+seguida, batendo de novo no `ON DELETE RESTRICT`. Decidir se o guard mora na rota ou no serviço.
 
 ---
 

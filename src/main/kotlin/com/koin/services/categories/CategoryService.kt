@@ -80,9 +80,6 @@ class CategoryService {
             }
     }
 
-    // getCategoryById foi removido no P6 (2026-07-29): seu único chamador era a pré-checagem do
-    // DELETE, e ela sumiu quando o row count do deleteWhere passou a ser a autorização. Não existe
-    // rota GET /categories/{id}. Se um dia existir, o formato está no addCost (CostService.kt:106).
     suspend fun editCategory(id: Int, userId: Int, patch: CategoryPatch): Boolean = DatabaseFactory.dbQuery {
         CategoriesTable.update(where = { (CategoriesTable.id eq id) and (CategoriesTable.userId eq userId) }) {
             patch.name?.let { newName -> it[name] = newName }

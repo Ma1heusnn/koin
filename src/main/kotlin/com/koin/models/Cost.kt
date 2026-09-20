@@ -5,18 +5,6 @@ import kotlinx.serialization.Serializable
 import java.math.BigDecimal
 
 @Serializable
-data class Cost(
-    val id: Int,
-    val userId: Int,
-    val title: String,
-    val description: String,
-    val categoryId: Int,
-    @Contextual
-    val value: BigDecimal,
-    val type: TransactionType
-)
-
-@Serializable
 data class CostDTO(
     val title: String,
     val description: String = "",

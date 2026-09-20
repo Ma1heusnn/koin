@@ -392,8 +392,6 @@ categoria tem 12 custos, mover para onde?" com o seletor — a lista de destinos
 **Esboço do serviço — tudo num `dbQuery` só:**
 
 ```
-1. count custos da categoria (user_id + category_id)   // reaproveitar/trocar o costsByCategory,
-                                                       // que hoje é codigo morto (CostService.kt:77)
 2. se > 0 e moveTo == null  -> Refused(count)          // rota responde 409 com a contagem
 3. validar moveTo: existe E (e do user OU global)      // MESMA regra do addCost (CostService.kt:106)
 4. UPDATE costs SET category_id = moveTo WHERE category_id = id AND user_id = userId

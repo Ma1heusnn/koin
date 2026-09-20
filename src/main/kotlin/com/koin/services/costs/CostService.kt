@@ -2,7 +2,6 @@ package com.koin.services.costs
 
 import com.koin.factory.DatabaseFactory
 import com.koin.models.Category
-import com.koin.models.Cost
 import com.koin.models.CostDTO
 import com.koin.models.CostDTOResponse
 import com.koin.models.CostPatch
@@ -70,22 +69,6 @@ class CostService {
                     category = category,
                     value = it[CostsTable.value],
                     type = it[CostsTable.type]
-                )
-            }
-    }
-
-    suspend fun costsByCategory(categoryId: Int, userId: Int): List<Cost> = DatabaseFactory.dbQuery {
-        CostsTable.selectAll()
-            .where { (CostsTable.categoryId eq categoryId) and (CostsTable.userId eq userId) }
-            .map {
-                Cost(
-                    id = it[CostsTable.id].value,
-                    title = it[CostsTable.title],
-                    description = it[CostsTable.description],
-                    categoryId = it[CostsTable.categoryId],
-                    value = it[CostsTable.value],
-                    type = it[CostsTable.type],
-                    userId = it[CostsTable.userId]
                 )
             }
     }

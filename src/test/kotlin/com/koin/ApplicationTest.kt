@@ -963,8 +963,9 @@ class ApplicationTest {
         }
         assertEquals(HttpStatusCode.BadRequest, invalido.status)
     }
+
     @Test
-    fun `campos agora possuem validacao de numero de caracteres (S5)` () = testApplication {
+    fun `campos agora possuem validacao de numero de caracteres (S5)`() = testApplication {
         bootH2()
         val client = jsonClient()
         val token = client.registrarELogar(email = "testeS5NumCaracteres@gmail.com", username = "testeS5NumCaracteres")
@@ -975,42 +976,69 @@ class ApplicationTest {
         val limiteCaracteresDescricao = 256
 
         // teste de cadastro com email > 128 caracteres
-        val respostaCadastroEmail = client.post("/users"){
+        val respostaCadastroEmail = client.post("/users") {
             contentType(ContentType.Application.Json)
-            setBody(UserDTO(email = "a".repeat(limiteCaracteresEmail) + "@gmail.com", password = "1SenhaLimiteCaracteresS5", username = "TesteS5"))
+            setBody(
+                UserDTO(
+                    email = "a".repeat(limiteCaracteresEmail) + "@gmail.com",
+                    password = "1SenhaLimiteCaracteresS5",
+                    username = "TesteS5"
+                )
+            )
         }
         assertEquals(HttpStatusCode.BadRequest, respostaCadastroEmail.status)
 
-        val respostaCadastroUsername = client.post("/users"){
+        val respostaCadastroUsername = client.post("/users") {
             contentType(ContentType.Application.Json)
-            setBody(UserDTO(email = "testedenumerocaracteres@gmail.com", username = "a".repeat(limiteCaracteresUsername), password = "2SenhaLimiteCaracteresS5"))
+            setBody(
+                UserDTO(
+                    email = "testedenumerocaracteres@gmail.com",
+                    username = "a".repeat(limiteCaracteresUsername),
+                    password = "2SenhaLimiteCaracteresS5"
+                )
+            )
         }
         assertEquals(HttpStatusCode.BadRequest, respostaCadastroUsername.status)
 
-        val respostaCriarCategoriaTitulo = client.post("/categories"){
+        val respostaCriarCategoriaTitulo = client.post("/categories") {
             contentType(ContentType.Application.Json)
             header(HttpHeaders.Authorization, "Bearer $token")
             setBody(CategoryDTO(name = "a".repeat(limiteCaracteresTitulo)))
         }
         assertEquals(HttpStatusCode.BadRequest, respostaCriarCategoriaTitulo.status)
 
-        val categoryId = client.post("/categories"){
+        val categoryId = client.post("/categories") {
             contentType(ContentType.Application.Json)
             header(HttpHeaders.Authorization, "Bearer $token")
             setBody(CategoryDTO(name = "CategoriaTesteS5"))
-        }.body<Category>().id?: 0
+        }.body<Category>().id ?: 0
 
-        val respostaCriarCustoTitulo = client.post("/costs"){
+        val respostaCriarCustoTitulo = client.post("/costs") {
             contentType(ContentType.Application.Json)
             header(HttpHeaders.Authorization, "Bearer $token")
-            setBody(CostDTO(title = "a".repeat(limiteCaracteresTitulo), categoryId = categoryId, value = BigDecimal(100.00), type = TransactionType.OUTFLOW))
+            setBody(
+                CostDTO(
+                    title = "a".repeat(limiteCaracteresTitulo),
+                    categoryId = categoryId,
+                    value = BigDecimal(100.00),
+                    type = TransactionType.OUTFLOW
+                )
+            )
         }
         assertEquals(HttpStatusCode.BadRequest, respostaCriarCustoTitulo.status)
 
-        val respostaCriarCustoDescricao = client.post("/costs"){
+        val respostaCriarCustoDescricao = client.post("/costs") {
             contentType(ContentType.Application.Json)
             header(HttpHeaders.Authorization, "Bearer $token")
-            setBody(CostDTO(title = "TesteS5", description = "a".repeat(limiteCaracteresDescricao), categoryId = categoryId, value = BigDecimal(100.00), type = TransactionType.OUTFLOW))
+            setBody(
+                CostDTO(
+                    title = "TesteS5",
+                    description = "a".repeat(limiteCaracteresDescricao),
+                    categoryId = categoryId,
+                    value = BigDecimal(100.00),
+                    type = TransactionType.OUTFLOW
+                )
+            )
         }
         assertEquals(HttpStatusCode.BadRequest, respostaCriarCustoDescricao.status)
     }
@@ -1101,5 +1129,102 @@ class ApplicationTest {
             setBody(UserPatch(username = "a".repeat(33)))
         }
         assertEquals(HttpStatusCode.BadRequest, usernameLongo.status, "username do usuario")
+    }
+
+    @Test
+    fun `Categoria com custo sem moveTo retorna BadRequest`() = testApplication {
+        bootH2()
+        val client = jsonClient()
+        val token = client.registrarELogar(email = "emailTesteMoveTo1@gmail.com", username = "usernameTesteMoveTo1")
+        fun HttpRequestBuilder.auth() = header(HttpHeaders.Authorization, "Bearer $token")
+
+        // cria uma categoria inicial para inserirmos um custo
+
+        val categoryId = client.post("/categories") {
+            auth()
+            contentType(ContentType.Application.Json)
+            setBody(CategoryDTO(name = "Categoria Teste MoveTo1"))
+        }.body<Category>().id!!
+
+        // inserimos um custo dentro da categoria criada
+
+        val costId = client.post("/costs") {
+            auth()
+            contentType(ContentType.Application.Json)
+            setBody(
+                CostDTO(
+                    title = "Custo Teste MoveTo1",
+                    categoryId = categoryId,
+                    value = BigDecimal(100),
+                    type = TransactionType.OUTFLOW
+                )
+            )
+        }
+
+        // tentamos excluir a categoria de teste, já que ela possui um custo dentro e não declaramos um moveTo no endpoint, será retornado a nós o resultado 400 cobrando o moveTo e dizendo o número de custos pendentes a serem trocados
+        //TODO: Futuramente irá retornar 409 (D1)
+
+        val deleteSemMoveTo = client.delete("/categories/$categoryId") {
+            auth()
+            contentType(ContentType.Application.Json)
+        }
+        assertEquals(HttpStatusCode.BadRequest, deleteSemMoveTo.status, "delete de categoria sem moveTo")
+    }
+
+    @Test
+    fun `Categoria com custo com moveTO move os custos corretamente`() = testApplication {
+        bootH2()
+        val client = jsonClient()
+        val token = client.registrarELogar(email = "emailTesteMoveTo2@gmail.com", username = "usernameTesteMoveTo2")
+
+        fun HttpRequestBuilder.auth() = header(HttpHeaders.Authorization, "Bearer $token")
+
+        // cria uma categoria inicial para inserirmos um custo
+
+        val categoryId = client.post("/categories") {
+            auth()
+            contentType(ContentType.Application.Json)
+            setBody(CategoryDTO(name = "Categoria Teste MoveTo2"))
+        }.body<Category>().id!!
+
+        // inserimos um custo dentro da categoria criada
+
+        val costId = client.post("/costs") {
+            auth()
+            contentType(ContentType.Application.Json)
+            setBody(
+                CostDTO(
+                    title = "Custo Teste MoveTo2",
+                    categoryId = categoryId,
+                    value = BigDecimal(100),
+                    type = TransactionType.OUTFLOW
+                )
+            )
+        }
+
+        // criamos a categoria que irá receber os custos da primeira através do moveTo
+
+        val categoriaMoveToId = client.post("/categories") {
+            auth()
+            contentType(ContentType.Application.Json)
+            setBody(CategoryDTO(name = "Categoria Teste MoveTo3"))
+        }.body<Category>().id!!
+
+        // realizamos a exclusão da primeira categoria, passando o parâmetro de moveTo para mover os custos existentes para a categoria nova
+
+        val deleteCategoriaComMoveTo = client.delete("/categories/$categoryId?moveTo=$categoriaMoveToId") {
+            auth()
+        }
+
+        assertEquals(HttpStatusCode.OK, deleteCategoriaComMoveTo.status, "delete categoria com moveTo")
+
+        // verificamos se o custo foi movido para dentro da categoria presente no moveTo
+
+        val consultaCategoriaDoMoveTo = client.get("/costs") {
+            auth()
+        }
+        val custos = consultaCategoriaDoMoveTo.body<List<CostDTOResponse>>()
+        val custoMovido = custos.first { it.title == "Custo Teste MoveTo2" }
+        assertEquals(categoriaMoveToId, custoMovido.category.id, "custo deveria ter migrado para a categoria destino")
     }
 }

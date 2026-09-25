@@ -314,7 +314,10 @@ Progresso das correções do code review. Ordem de ataque: **C1 → C2 → C3 �
 - **~~Rotação de segredos (do C4)~~ — CANCELADO:** não há repositório git e os valores são de sandbox. Nada exposto. O que fica é um checklist para o dia do `git init` (ver seção C4).
 - **Boot real contra o MySQL (do M2):** confirmar que o Flyway cria as 4 tabelas + `flyway_schema_history`.
 - **Limpeza de refresh tokens expirados (do H9):** `DELETE WHERE expires_at < now OR revoked`. Tabela cresce sem parar; não afeta corretude.
-- **`XForwardedHeaders` (do M6):** obrigatório assim que houver proxy/LB na frente, senão o rate limit vira um balde único para todo mundo.
+- **`XForwardedHeaders` (do M6) — ADIADO por decisão (2026-09-25):** não há proxy nem plano de deploy, então `origin.remoteAddress` já é o IP real do cliente. Gatilho: o dia em que houver proxy/LB na frente (senão o rate limit vira um balde único para todo mundo). Receita:
+  - `install(XForwardedHeaders) { useLastProxy() }` com **um** proxy que *anexa* (`proxy_add_x_forwarded_for`); `skipLastProxies(n)` com cadeia de proxies. O padrão do Ktor é o **primeiro** valor — o que o cliente escreve.
+  - **Pré-condição:** a app só pode ser alcançável através do proxy (escutar em rede interna/`127.0.0.1`). Exposta direto, o atacante forja `X-Forwarded-For` e ganha balde novo por request — bypass total.
+  - Teste junto: request com `X-Forwarded-For` forjado não pode escapar do balde.
 - **Camada de volume no rate limit (do M6):** teto por IP contando **falhas** (não requests), para pegar credential stuffing que varre muitas contas. Precisa de contador no branch do 401 + Redis se houver 2ª instância. Gatilho: tráfego real ou 2ª instância.
 - **CORS (do M6):** só quando existir front web.
 

@@ -491,8 +491,9 @@ conta bloqueada. Consertar o S1 baixa a urgência disto.
 ## M5 — pendências já registradas em outros documentos (continuam abertas)
 
 - **Limpeza de `refresh_tokens`** expirados/revogados (do H9): `DELETE WHERE expires_at < now OR revoked`.
-- **`XForwardedHeaders`** (do M6): obrigatório no dia em que houver proxy/LB, senão o rate limit
-  (e o S4 novo) viram um balde único para todos.
+- **`XForwardedHeaders`** (do M6) — **adiado por decisão em 2026-09-25** (sem proxy nem plano de
+  deploy). Obrigatório no dia em que houver proxy/LB, senão o rate limit (e o S4) viram um balde
+  único para todos. Receita e pré-condição (app inalcançável sem o proxy) no `PROGRESSO.md`.
 - **Camada de volume no rate limit** (do M6): teto por IP contando **falhas**. Gatilho: tráfego real
   ou 2ª instância.
 - **CORS** (do M6): só quando existir front web.
